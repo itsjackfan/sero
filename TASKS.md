@@ -1,4 +1,4 @@
-JACK -- 1. create data models
+JACK -- 1. create data models + set up Supabase + DevOps
 2. API endpoints + testing
    *NOTE: APi endpoints are fluid, this is a general schema; also, when you have API endpoints that work, pair program w frontend person to get them locked in/tested/correctly integrated*
     EMILY -- a. signup/account creation
