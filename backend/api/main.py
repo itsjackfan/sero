@@ -33,11 +33,10 @@ app.add_middleware(
     allow_origins=["*"],
     # Regex for Vercel prod and preview deployments: https://<subdomain>.vercel.app
     # allow_origin_regex=r"https://(.*\\.)?sero-three\\.vercel\\.app$",
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
 
 
 @app.get("/")
