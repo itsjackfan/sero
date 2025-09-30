@@ -1,0 +1,29 @@
+# Ignore Python caches and environments
+**/__pycache__/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.pytest_cache
+**/venv/
+venv/
+**/.venv/
+/.venv/
+
+# Environment files
+.env
+.env.*
+
+# Git and editor files
+.git
+.gitignore
+*.swp
+*.swo
+*.DS_Store
+
+# Tests and logs
+tests
+*.log
+
+# UV working directory
+.uv
