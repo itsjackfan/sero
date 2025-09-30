@@ -29,17 +29,14 @@ app.include_router(gemini_router)
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    # Allow localhost and local network IPs during development
-    allow_origins=[
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-        "http://10.250.207.222:3000",
-    ],
-    allow_credentials=True,
+    # Exact origins (local dev)
+    allow_origins=["*"],
+    # Regex for Vercel prod and preview deployments: https://<subdomain>.vercel.app
+    # allow_origin_regex=r"https://(.*\\.)?sero-three\\.vercel\\.app$",
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
 
 
 @app.get("/")

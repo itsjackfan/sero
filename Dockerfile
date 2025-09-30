@@ -1,7 +1,8 @@
 # Use UV's official Python image for fast, reproducible installs
 FROM ghcr.io/astral-sh/uv:python3.11-bookworm
+#
 
-# Work in a stable path containing the repo so that `backend.*` imports work
+# Work in a stable path; build context is repo root
 WORKDIR /app
 
 # Copy backend project metadata first to leverage Docker layer caching
@@ -11,7 +12,7 @@ COPY backend/pyproject.toml backend/uv.lock /app/backend/
 RUN cd /app/backend \
     && uv sync --frozen --no-dev
 
-# Now copy the backend source
+# Now copy only the backend source (frontend is ignored by .dockerignore)
 COPY backend /app/backend
 
 # Make virtualenv and project importable by default
