@@ -30,13 +30,9 @@ app.include_router(gemini_router)
 app.add_middleware(
     CORSMiddleware,
     # Exact origins (local dev)
-    allow_origins=[
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-        "https://sero-three.vercel.app",
-    ],
+    allow_origins=["*"],
     # Regex for Vercel prod and preview deployments: https://<subdomain>.vercel.app
-    allow_origin_regex=r"https://(.*\\.)?sero-three\\.vercel\\.app$",
+    # allow_origin_regex=r"https://(.*\\.)?sero-three\\.vercel\\.app$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
