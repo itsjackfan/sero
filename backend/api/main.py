@@ -9,6 +9,7 @@ from supabase import Client
 from dependencies import get_supabase
 
 from api.chronotype import router as chronotype_router
+from api.quiz import router as quiz_router
 
 app = FastAPI(
     title="Sero Backend API",
@@ -19,10 +20,18 @@ app = FastAPI(
 # add chronotype endpoints router
 app.include_router(chronotype_router)
 
+# add quiz endpoints router
+app.include_router(quiz_router)
+
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],  # Add your frontend URL
+    # Allow localhost and local network IPs during development
+    allow_origins=[
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://10.250.207.222:3000",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
