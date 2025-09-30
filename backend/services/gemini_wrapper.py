@@ -18,7 +18,7 @@ Then it gets back
 
 from google import genai
 from google.genai import types
-import os
+from backend.config import settings
 from typing import Optional
 
 class GeminiWrapper:
@@ -32,19 +32,19 @@ class GeminiWrapper:
             api_key: Google API key. If None, will try to get from environment variable GOOGLE_API_KEY
         """
         if api_key is None:
-            api_key = os.getenv("GOOGLE_API_KEY")
+            api_key = settings.google_api_key
             if not api_key:
                 raise ValueError("API key must be provided either as parameter or GOOGLE_API_KEY environment variable")
         
         self.client = genai.Client(api_key=api_key)
     
-    def generate_content(self, prompt: str, model: str = "gemini-2.5-flash-lite") -> str:
+    def generate_content(self, prompt: str, model: str = "gemini-2.5-flash") -> str:
         """
         Generate content using Gemini with minimal thinking budget.
         
         Args:
             prompt: The input prompt for the model
-            model: The model to use (default: gemini-2.5-flash-lite)
+            model: The model to use (default: gemini-2.5-flash)
             
         Returns:
             Generated text response
@@ -61,13 +61,13 @@ class GeminiWrapper:
         except Exception as e:
             raise Exception(f"Error generating content: {str(e)}")
     
-    def chat(self, message: str, model: str = "gemini-2.5-flash-lite") -> str:
+    def chat(self, message: str, model: str = "gemini-2.5-flash") -> str:
         """
         Simple chat interface - alias for generate_content.
         
         Args:
             message: The message to send to the model
-            model: The model to use (default: gemini-2.5-flash-lite)
+            model: The model to use (default: gemini-2.5-flash)
             
         Returns:
             Generated text response

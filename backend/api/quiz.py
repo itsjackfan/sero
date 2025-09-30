@@ -5,9 +5,9 @@ from typing import Dict, List
 from fastapi import APIRouter, Depends, HTTPException, status
 from supabase import Client
 
-from models.quiz import QuizSubmission, QuizSubmissionResponse, ChronotypeResult, QuizResponse
-from models.chronotype import ChronotypeCreate, ChronotypeDataPoint
-from dependencies import get_supabase
+from backend.models.quiz import QuizSubmission, QuizSubmissionResponse, ChronotypeResult, QuizResponse
+from backend.models.chronotype import ChronotypeCreate, ChronotypeDataPoint
+from backend.dependencies import get_supabase
 
 router = APIRouter(prefix="/quiz", tags=["Quiz"])
 

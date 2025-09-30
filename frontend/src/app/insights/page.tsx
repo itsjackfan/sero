@@ -69,7 +69,8 @@ export default function InsightsPage() {
         },
         body: JSON.stringify({
           message: trimmed,
-          history: nextMessages.map(({ role, content }) => ({ role, content })),
+          // history: nextMessages.map(({ role, content }) => ({ role, content }))
+          model: 'gemini-2.5-flash'
         }),
       });
 
@@ -77,8 +78,8 @@ export default function InsightsPage() {
         throw new Error('Request failed');
       }
 
-      const data: { reply?: string; message?: string } = await response.json();
-      const assistantReply = data.reply || data.message || 'I could not generate new insights just now. Try another prompt in a moment.';
+      const data: { response: string; success: boolean } = await response.json();
+      const assistantReply = data.response || 'I could not generate new insights just now. Try another prompt in a moment.';
 
       setMessages((prev) => [
         ...prev,

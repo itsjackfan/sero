@@ -1,6 +1,10 @@
 from fastapi import APIRouter, HTTPException
-from ..services.gemini_wrapper import GeminiWrapper
-from ..models.gemini import ChatRequest, ChatResponse
+from backend.services.gemini_wrapper import GeminiWrapper
+from backend.models.gemini import ChatRequest, ChatResponse
+import logging
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 router = APIRouter(prefix="/gemini", tags=["Gemini"])
 
@@ -16,6 +20,8 @@ async def chat_with_gemini(request: ChatRequest):
     """
     Chat endpoint for frontend to interact with Gemini.
     """
+    print('hi')
+    print(request)
     if gemini is None:
         raise HTTPException(
             status_code=500, 

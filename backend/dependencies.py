@@ -2,7 +2,7 @@ from functools import lru_cache
 
 from supabase import Client, create_client
 
-from config import settings
+from backend.config import settings
 # from services.rl_engine import ChronotypeRLEngine
 
 

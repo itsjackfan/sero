@@ -4,8 +4,8 @@ from uuid import uuid4
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from supabase import Client
 
-from models.chronotype import ChronotypeCreate, ChronotypeResponse, ChronotypeUpdate
-from dependencies import get_supabase
+from backend.models.chronotype import ChronotypeCreate, ChronotypeResponse, ChronotypeUpdate
+from backend.dependencies import get_supabase
 
 router = APIRouter(prefix="/chronotype", tags=["Chronotype"])
 

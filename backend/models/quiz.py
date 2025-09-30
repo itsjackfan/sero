@@ -1,6 +1,5 @@
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 from pydantic import BaseModel, Field
-
 
 class QuizResponse(BaseModel):
     """Individual quiz question response."""
@@ -22,7 +21,7 @@ class ChronotypeResult(BaseModel):
     """Result of chronotype analysis from quiz."""
     chronotype_type: str = Field(..., description="Early Bird, Night Owl, or Intermediate")
     confidence_score: float = Field(..., ge=0.0, le=1.0, description="Confidence in the classification")
-    analysis_details: Dict[str, any] = Field(default_factory=dict, description="Detailed analysis breakdown")
+    analysis_details: Dict[str, Any] = Field(default_factory=dict, description="Detailed analysis breakdown")
     recommended_sleep_schedule: Dict[str, str] = Field(default_factory=dict, description="Recommended bed/wake times")
 
 

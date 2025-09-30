@@ -5,11 +5,11 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from supabase import Client
 
-from dependencies import get_supabase
+from backend.dependencies import get_supabase
 
-from api.chronotype import router as chronotype_router
-from api.quiz import router as quiz_router
-from api.gemini import router as gemini_router
+from backend.api.chronotype import router as chronotype_router
+from backend.api.quiz import router as quiz_router
+from backend.api.gemini import router as gemini_router
 
 app = FastAPI(
     title="Sero Backend API",
