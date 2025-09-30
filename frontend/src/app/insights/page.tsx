@@ -3,6 +3,7 @@
 import { FormEvent, KeyboardEvent, useMemo, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
+import { useAuth } from '@/contexts/AuthContext';
 
 type ChatMessage = {
   id: string;
@@ -12,11 +13,13 @@ type ChatMessage = {
 
 export default function InsightsPage() {
   const chatEndpoint = process.env.NEXT_PUBLIC_API_URL + '/gemini/chat';
+  const { user, loading } = useAuth();
+  const name = user?.identities?.[0]?.identity_data?.full_name;
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: 'assistant-welcome',
       role: 'assistant',
-      content: 'Welcome back, John. I am tracking how your energy and tasks align. What would you like to explore today?',
+      content: `Welcome back. I am tracking how your energy and tasks align. What would you like to explore today?`,
     },
   ]);
   const [input, setInput] = useState('');

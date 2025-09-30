@@ -12,8 +12,11 @@ import {
   YAxis,
 } from 'recharts';
 import Link from 'next/link';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function DashboardPage() {
+  const { user, loading } = useAuth();
+  const name = user?.identities?.[0]?.identity_data?.full_name;
   const [showChronotypeModal, setShowChronotypeModal] = useState(false);
   const [showEnergyModal, setShowEnergyModal] = useState(false);
 
@@ -88,7 +91,7 @@ export default function DashboardPage() {
 
             {/* Main */}
             <main className="p-8">
-              <h1 className="text-[22px] font-semibold text-gray-900">Good afternoon, John.</h1>
+              <h1 className="text-[22px] font-semibold text-gray-900">Good afternoon, {loading ? '...' : (name || (user?.email?.split('@')[0] ?? 'User'))}.</h1>
               <div className="mt-1 text-sm text-gray-800 font-semibold">Your flow at a glance</div>
               <div className="text-[10px] text-gray-500">Productivity analytics</div>
 
