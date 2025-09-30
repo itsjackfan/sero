@@ -135,6 +135,49 @@ def mock_supabase_client():
     app.dependency_overrides.clear()
 
 
+class MockRLEngine:
+    def __init__(self):
+        self.train_calls: List[Dict[str, Any]] = []
+        self.next_data_points: List[Dict[str, Any]] = []
+        self.next_training_metadata: Dict[str, Any] = {}
+
+    def train_and_predict(self, chronotype: Dict[str, Any], feedback: List[Dict[str, Any]], config: Dict[str, Any]):
+        call_details = {
+            "chronotype": copy.deepcopy(chronotype),
+            "feedback": copy.deepcopy(feedback),
+            "config": copy.deepcopy(config),
+        }
+        self.train_calls.append(call_details)
+
+        updated_chronotype = copy.deepcopy(chronotype)
+        if self.next_data_points:
+            updated_chronotype["data_points"] = copy.deepcopy(self.next_data_points)
+
+        return {
+            "chronotype": updated_chronotype,
+            "training_metadata": copy.deepcopy(self.next_training_metadata),
+        }
+
+
+@pytest.fixture
+def mock_rl_engine(mock_supabase_client):
+    from api import main as main_module
+
+    dependency = getattr(main_module, "get_rl_engine", None)
+    assert (
+        dependency is not None
+    ), "get_rl_engine dependency is not implemented yet; please add it to the application"
+
+    mock_engine = MockRLEngine()
+
+    async def override_rl_engine():
+        return mock_engine
+
+    app.dependency_overrides[dependency] = override_rl_engine
+    yield mock_engine
+    app.dependency_overrides.pop(dependency, None)
+
+
 @pytest.fixture
 def client(mock_supabase_client):
     return TestClient(app)
