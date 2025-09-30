@@ -32,7 +32,8 @@ app.add_middleware(
     # Allow localhost and local network IPs during development
     allow_origins=[
         "http://localhost:3000",
-        "https://sero-three.vercel.app"
+        "https://sero-three.vercel.app",
+        "https://sero-three.vercel.app/*",
         "http://127.0.0.1:3000",
         "http://10.250.207.222:3000",
     ],
