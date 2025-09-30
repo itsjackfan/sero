@@ -27,3 +27,6 @@ tests
 
 # UV working directory
 .uv
+
+# Exclude the entire frontend from the image build context
+frontend/
