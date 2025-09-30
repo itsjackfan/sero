@@ -1,8 +1,7 @@
 import os
 from datetime import datetime
-from typing import List, Optional
 
-from fastapi import FastAPI, HTTPException, Depends
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from supabase import Client
 
@@ -10,6 +9,7 @@ from dependencies import get_supabase
 
 from api.chronotype import router as chronotype_router
 from api.quiz import router as quiz_router
+from api.gemini import router as gemini_router
 
 app = FastAPI(
     title="Sero Backend API",
@@ -22,6 +22,9 @@ app.include_router(chronotype_router)
 
 # add quiz endpoints router
 app.include_router(quiz_router)
+
+# add gemini wrapper endpoints router
+app.include_router(gemini_router)
 
 # CORS middleware
 app.add_middleware(
