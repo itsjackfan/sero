@@ -1,3 +1,12 @@
+## USER TESTING PUSH
+- [ ] update insights chatbot to actually remember context
+- [ ] rewrite insights chatbot prompt
+- [ ] seed with real chronotype information 
+- [ ] store specific users' chronotypes and data in the database and pull from there across the whole app (remove placeholders)
+- [ ] codebase refactor and cleanup 
+
+---
+## MIDTERM CRIT
 JACK -- 1. create data models + set up Supabase + DevOps
 2. API endpoints + testing
    *NOTE: APi endpoints are fluid, this is a general schema; also, when you have API endpoints that work, pair program w frontend person to get them locked in/tested/correctly integrated*

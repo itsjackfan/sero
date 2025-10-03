@@ -27,112 +27,112 @@ export function SettingsSidebar({ isOpen, onClose }: SettingsSidebarProps) {
   const [calendarsError, setCalendarsError] = useState<string | null>(null);
   const [requiresGoogleAuth, setRequiresGoogleAuth] = useState(false);
 
-  const fetchCalendars = useCallback(async () => {
-    if (!session) return;
+  // const fetchCalendars = useCallback(async () => {
+  //   if (!session) return;
     
-    setCalendarsLoading(true);
-    setCalendarsError(null);
+  //   setCalendarsLoading(true);
+  //   setCalendarsError(null);
 
-    try {
-      // Make API call to backend
-      const response = await fetch('/api/google/calendars', {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`,
-        },
-      });
+  //   try {
+  //     // Make API call to backend
+  //     const response = await fetch('/api/google/calendars', {
+  //       method: 'GET',
+  //       headers: {
+  //         'Content-Type': 'application/json',
+  //         'Authorization': `Bearer ${session.access_token}`,
+  //       },
+  //     });
       
-      if (!response.ok) {
-        if (response.status === 401) {
-          setRequiresGoogleAuth(true);
-          const body = await response.json().catch(() => ({}));
-          if (body.error === 'google_auth_required') {
-            setCalendarsError('Connect your Google account to sync calendars.');
-            return;
-          }
-        }
+  //     if (!response.ok) {
+  //       if (response.status === 401) {
+  //         setRequiresGoogleAuth(true);
+  //         const body = await response.json().catch(() => ({}));
+  //         if (body.error === 'google_auth_required') {
+  //           setCalendarsError('Connect your Google account to sync calendars.');
+  //           return;
+  //         }
+  //       }
 
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
+  //       throw new Error(`HTTP error! status: ${response.status}`);
+  //     }
       
-      const data = await response.json();
+  //     const data = await response.json();
       
-      if (Array.isArray(data.calendars)) {
-        setCalendars(data.calendars);
-        setRequiresGoogleAuth(false);
-      } else {
-        throw new Error('Unexpected response from calendar endpoint');
-      }
-    } catch (error) {
-      console.error('Error fetching calendars:', error);
-      if (!requiresGoogleAuth) {
-        setCalendarsError('Failed to load calendars. Please try again.');
-      }
-    } finally {
-      setCalendarsLoading(false);
-    }
-  }, [session, requiresGoogleAuth]);
+  //     if (Array.isArray(data.calendars)) {
+  //       setCalendars(data.calendars);
+  //       setRequiresGoogleAuth(false);
+  //     } else {
+  //       throw new Error('Unexpected response from calendar endpoint');
+  //     }
+  //   } catch (error) {
+  //     console.error('Error fetching calendars:', error);
+  //     if (!requiresGoogleAuth) {
+  //       setCalendarsError('Failed to load calendars. Please try again.');
+  //     }
+  //   } finally {
+  //     setCalendarsLoading(false);
+  //   }
+  // }, [session, requiresGoogleAuth]);
 
-  const toggleCalendar = useCallback(async (calendarId: string) => {
-    // Update local state immediately for responsive UI
-    setCalendars(prev => prev.map(cal => 
-      cal.id === calendarId 
-        ? { ...cal, enabled: !cal.enabled }
-        : cal
-    ));
+  // const toggleCalendar = useCallback(async (calendarId: string) => {
+  //   // Update local state immediately for responsive UI
+  //   setCalendars(prev => prev.map(cal => 
+  //     cal.id === calendarId 
+  //       ? { ...cal, enabled: !cal.enabled }
+  //       : cal
+  //   ));
     
-    try {
-      // Get updated enabled calendars
-      const enabledCalendars = calendars
-        .map(cal => cal.id === calendarId ? { ...cal, enabled: !cal.enabled } : cal)
-        .filter(cal => cal.enabled)
-        .map(cal => cal.id);
+  //   try {
+  //     // Get updated enabled calendars
+  //     const enabledCalendars = calendars
+  //       .map(cal => cal.id === calendarId ? { ...cal, enabled: !cal.enabled } : cal)
+  //       .filter(cal => cal.enabled)
+  //       .map(cal => cal.id);
       
-      // Save to backend
-      const response = await fetch('/api/user/calendars', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session?.access_token}`,
-        },
-        body: JSON.stringify({
-          enabled_calendars: enabledCalendars,
-          sync_frequency: 'realtime'
-        }),
-      });
+  //     // Save to backend
+  //     const response = await fetch('/api/user/calendars', {
+  //       method: 'POST',
+  //       headers: {
+  //         'Content-Type': 'application/json',
+  //         'Authorization': `Bearer ${session?.access_token}`,
+  //       },
+  //       body: JSON.stringify({
+  //         enabled_calendars: enabledCalendars,
+  //         sync_frequency: 'realtime'
+  //       }),
+  //     });
       
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
+  //     if (!response.ok) {
+  //       throw new Error(`HTTP error! status: ${response.status}`);
+  //     }
       
-      const data = await response.json();
-      if (!response.ok || !data?.success) {
-        throw new Error(data?.message || 'Failed to save calendar settings');
-      }
+  //     const data = await response.json();
+  //     if (!response.ok || !data?.success) {
+  //       throw new Error(data?.message || 'Failed to save calendar settings');
+  //     }
       
-      console.log('Calendar settings saved successfully');
-    } catch (error) {
-      console.error('Error saving calendar settings:', error);
-      // Revert local state on error
-      setCalendars(prev => prev.map(cal => 
-        cal.id === calendarId 
-          ? { ...cal, enabled: !cal.enabled }
-          : cal
-      ));
-      setCalendarsError('Failed to save calendar preferences. Please try again.');
-    }
-  }, [calendars, session]);
+  //     console.log('Calendar settings saved successfully');
+  //   } catch (error) {
+  //     console.error('Error saving calendar settings:', error);
+  //     // Revert local state on error
+  //     setCalendars(prev => prev.map(cal => 
+  //       cal.id === calendarId 
+  //         ? { ...cal, enabled: !cal.enabled }
+  //         : cal
+  //     ));
+  //     setCalendarsError('Failed to save calendar preferences. Please try again.');
+  //   }
+  // }, [calendars, session]);
 
   useEffect(() => {
     if (isOpen && activeTab === 'calendar') {
-      fetchCalendars();
+      // fetchCalendars();
     }
-  }, [isOpen, activeTab, fetchCalendars]);
+  }, [isOpen, activeTab]);
 
-  const handleConnectGoogle = () => {
-    window.location.href = '/api/google/auth';
-  };
+  // const handleConnectGoogle = () => {
+  //   window.location.href = '/api/google/auth';
+  // };
 
   const tabs = [
     { id: 'general' as const, label: 'General', icon: '⚙️' },
@@ -188,8 +188,8 @@ export function SettingsSidebar({ isOpen, onClose }: SettingsSidebarProps) {
               </p>
               <button
                 type="button"
-                className="inline-flex items-center gap-2 rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-gray-800"
-                onClick={handleConnectGoogle}
+                className="inline-flex disabled items-center gap-2 rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-gray-800"
+                // onClick={handleConnectGoogle}
               >
                 Connect Google Calendar
               </button>
@@ -211,8 +211,8 @@ export function SettingsSidebar({ isOpen, onClose }: SettingsSidebarProps) {
               </div>
               <button
                 type="button"
-                className="mt-2 text-sm text-red-600 hover:text-red-800 underline"
-                onClick={fetchCalendars}
+                className="mt-2 disabled text-sm text-red-600 hover:text-red-800 underline"
+                // onClick={fetchCalendars}
               >
                 Try again
               </button>
@@ -248,7 +248,7 @@ export function SettingsSidebar({ isOpen, onClose }: SettingsSidebarProps) {
                       type="checkbox"
                       className="sr-only peer"
                       checked={calendar.enabled}
-                      onChange={() => toggleCalendar(calendar.id)}
+                      // onChange={() => toggleCalendar(calendar.id)}
                     />
                     <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-gray-900/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-gray-900"></div>
                   </label>
@@ -259,7 +259,7 @@ export function SettingsSidebar({ isOpen, onClose }: SettingsSidebarProps) {
                 <button
                   type="button"
                   className="w-full px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors"
-                  onClick={fetchCalendars}
+                  // onClick={fetchCalendars}
                 >
                   Refresh Calendars
                 </button>
