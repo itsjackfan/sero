@@ -1,7 +1,9 @@
 ## USER TESTING PUSH
+- [ ] login validation and account creation logic
 - [ ] update insights chatbot to actually remember context
 - [ ] rewrite insights chatbot prompt
 - [ ] seed with real chronotype information 
+- [ ] ensure that users get a duplicate of a base chronotype that is then ready to be modified and that the app reads from HERE, not from the base chronotype
 - [ ] store specific users' chronotypes and data in the database and pull from there across the whole app (remove placeholders)
 - [ ] codebase refactor and cleanup 
 
@@ -16,4 +18,4 @@ JACK -- 1. create data models + set up Supabase + DevOps
     VIHAAN -- d. click "higher or lower" button + data pushback -- stored as a "column" in the chronotype row (predicted, real, difference) --> training data to retrain model
     EMILY -- e. login*
     whoever gets to it first lol -- f. user/chronotype data fetch
-EMILY/VIHAAN -- 3. vibe translate the frontend (do the parts that correspond to ur API + anything else that you can...just communicate)
+EMILY/VIHAAN -- 3. vibe translate the frontend (do the parts that correspond to ur `API + anything else that you can...just communicate)
