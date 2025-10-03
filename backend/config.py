@@ -7,6 +7,7 @@ load_dotenv()
 class Settings(BaseSettings):
     supabase_url: str
     supabase_anon_key: str
+    supabase_service_role_key: str | None = None
 
     google_api_key: str
 

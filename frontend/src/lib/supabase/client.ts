@@ -6,5 +6,12 @@ export const createSupabaseBrowserClient = () => {
   if (!url || !anonKey) {
     throw new Error('Supabase env vars are missing');
   }
-  return createBrowserClient(url, anonKey);
+  return createBrowserClient(url, anonKey, {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
+      storageKey: 'sero-auth',
+    },
+  });
 };

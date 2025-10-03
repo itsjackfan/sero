@@ -1,280 +1,328 @@
-from datetime import datetime, time
-from uuid import uuid4
-from typing import Dict, List
+from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from datetime import datetime
+from typing import Any, Dict, List
+
+from fastapi import APIRouter, Depends, Header, HTTPException, status
 from supabase import Client
 
-from backend.models.quiz import QuizSubmission, QuizSubmissionResponse, ChronotypeResult, QuizResponse
-from backend.models.chronotype import ChronotypeCreate, ChronotypeDataPoint
 from backend.dependencies import get_supabase
+from backend.models import (
+    ChronotypeSummary,
+    QuizAttemptCreate,
+    QuizAttemptRecord,
+    QuizDefinition,
+    QuizQuestion,
+    QuizResponsePayload,
+    QuizSubmissionRequest,
+    QuizSubmissionResult,
+)
 
 router = APIRouter(prefix="/quiz", tags=["Quiz"])
 
 
-def analyze_chronotype(responses: List[QuizResponse]) -> ChronotypeResult:
-    """
-    Analyze quiz responses to determine chronotype.
-    Returns Early Bird, Night Owl, or Intermediate classification.
-    """
-    # Scoring system for chronotype determination
-    early_bird_score = 0
-    night_owl_score = 0
-    total_questions = 0
-    
-    analysis_details = {}
+_CHRONOTYPES = ["lion", "bear", "wolf", "dolphin"]
+
+
+_question_weights: Dict[str, Dict[str, Dict[str, float]]] = {
+    "sleep_deprivation_performance": {
+        "very-poorly": {"lion": 0.9, "bear": 0.6},
+        "poorly": {"lion": 0.7, "bear": 0.5},
+        "neither": {"bear": 0.5, "dolphin": 0.4},
+        "well": {"wolf": 0.7, "dolphin": 0.6},
+    },
+    "preferred_wake_time": {
+        "5am": {"lion": 1.0},
+        "6am": {"lion": 0.9},
+        "7am": {"bear": 0.8, "lion": 0.5},
+        "8am": {"bear": 0.7, "dolphin": 0.4},
+        "9am": {"wolf": 0.7, "bear": 0.4},
+        "10am": {"wolf": 1.0, "dolphin": 0.5},
+    },
+    "preferred_bed_time": {
+        "8pm": {"lion": 0.9},
+        "9pm": {"lion": 0.8},
+        "10pm": {"bear": 0.7, "dolphin": 0.4},
+        "11pm": {"bear": 0.6, "wolf": 0.4},
+        "12am": {"wolf": 0.7, "dolphin": 0.5},
+        "1am": {"wolf": 0.9, "dolphin": 0.6},
+    },
+    "morning_alertness": {
+        "not-alert": {"wolf": 0.8, "dolphin": 0.6},
+        "slightly-alert": {"bear": 0.4, "wolf": 0.6, "dolphin": 0.4},
+        "fairly-alert": {"bear": 0.7, "lion": 0.6},
+        "very-alert": {"lion": 0.9},
+    },
+    "exam_time_preference": {
+        "8am-test": {"lion": 0.9, "bear": 0.6},
+        "11am-test": {"bear": 0.8, "lion": 0.5},
+        "3pm-test": {"bear": 0.6, "wolf": 0.6, "dolphin": 0.4},
+        "7pm-test": {"wolf": 0.9, "dolphin": 0.7},
+    },
+    "bedtime_tiredness": {
+        "not-tired": {"wolf": 0.7, "dolphin": 0.5},
+        "slightly-tired": {"bear": 0.7, "wolf": 0.4},
+        "fairly-tired": {"bear": 0.8},
+        "very-tired": {"lion": 0.8, "dolphin": 0.4},
+    },
+    "late_night_recovery": {
+        "wake-later": {"lion": 0.6, "dolphin": 0.4},
+        "wake-later-sleep": {"bear": 0.6, "lion": 0.4},
+        "wake-much-later": {"wolf": 0.9, "bear": 0.5},
+    },
+}
+
+
+_sleep_schedule: Dict[str, Dict[str, str]] = {
+    "lion": {"bedtime": "9:00 PM - 10:00 PM", "wake_time": "5:00 AM - 6:00 AM"},
+    "bear": {"bedtime": "10:30 PM - 11:30 PM", "wake_time": "7:00 AM - 8:00 AM"},
+    "wolf": {"bedtime": "11:30 PM - 12:30 AM", "wake_time": "7:30 AM - 8:30 AM"},
+    "dolphin": {"bedtime": "11:00 PM - 12:00 AM", "wake_time": "6:30 AM - 7:30 AM"},
+}
+
+
+_recommendations: Dict[str, Dict[str, str]] = {
+    "lion": {
+        "focus": "Schedule demanding work before noon when your energy peaks.",
+        "evening": "Wind down with relaxing routines to protect early bedtime.",
+    },
+    "bear": {
+        "focus": "Anchor deep work mid-morning and maintain consistent sleep windows.",
+        "evening": "Plan lighter tasks after 6 PM as energy tapers.",
+    },
+    "wolf": {
+        "focus": "Reserve creative/problem-solving sessions late afternoon or evening.",
+        "morning": "Give yourself gradual ramp-up mornings with light tasks first.",
+    },
+    "dolphin": {
+        "focus": "Use structured routines and micro-rests to manage lighter sleep.",
+        "evening": "Avoid heavy stimulation before bed to improve sleep quality.",
+    },
+}
+
+
+async def _fetch_quiz_definition(db: Client, *, quiz_id: str | None = None) -> QuizDefinition:
+    query = db.table("quiz").select("id,title,version,quiz_question(*)")
+    if quiz_id:
+        query = query.eq("id", quiz_id)
+    query = query.order("version", desc=True).limit(1)
+
+    response = query.execute()
+    if not response.data:
+        raise HTTPException(status_code=404, detail="Quiz not found")
+
+    record = response.data[0]
+    questions_data = sorted(record["quiz_question"], key=lambda q: q["order_index"])
+
+    questions: List[QuizQuestion] = []
+    for row in questions_data:
+        options = row.get("options") or []
+        questions.append(
+            QuizQuestion(
+                id=row["id"],
+                question_key=row["question_key"],
+                prompt=row["prompt"],
+                question_type=row["question_type"],
+                points=float(row.get("points") or 1),
+                order_index=row["order_index"],
+                options=options,
+            )
+        )
+
+    return QuizDefinition(id=record["id"], title=record["title"], version=record["version"], questions=questions)
+
+
+def _weights_for_answer(question_key: str, answer_value: str) -> Dict[str, float]:
+    return _question_weights.get(question_key, {}).get(answer_value, {})
+
+
+def _normalize_scores(scores: Dict[str, float]) -> Dict[str, float]:
+    total = sum(scores.values()) or 1.0
+    return {chronotype: round(value / total, 4) for chronotype, value in scores.items()}
+
+
+def _determine_chronotype(scores: Dict[str, float]) -> str:
+    ordered = sorted(scores.items(), key=lambda item: item[1], reverse=True)
+    if not ordered:
+        return "bear"
+    top_type, top_score = ordered[0]
+    if len(ordered) > 1:
+        second_score = ordered[1][1]
+        if top_score - second_score < 0.1:
+            return "bear"
+    return top_type
+
+
+def _score_responses(quiz: QuizDefinition, responses: List[QuizResponsePayload]) -> Dict[str, Any]:
+    scores: Dict[str, float] = {name: 0.0 for name in _CHRONOTYPES}
+    per_question: Dict[str, Dict[str, float]] = {}
+
+    question_by_id = {question.id: question for question in quiz.questions}
     
     for response in responses:
-        question_id = response.question_id
-        response_value = response.response_value
-        
-        # Skip the welcome question (question 0)
-        if question_id == 0:
-            continue
-            
-        total_questions += 1
-        
-        # Question 1: Performance after staying up late
-        if question_id == 1:
-            if response_value in ["very-poorly", "poorly"]:
-                early_bird_score += 2
-            elif response_value == "neither":
-                early_bird_score += 1
-                night_owl_score += 1
-            elif response_value == "well":
-                night_owl_score += 2
-            analysis_details["late_night_performance"] = response_value
-        
-        # Question 2: Preferred wake time
-        elif question_id == 2:
-            if response_value in ["5am", "6am"]:
-                early_bird_score += 3
-            elif response_value == "7am":
-                early_bird_score += 2
-            elif response_value == "8am":
-                early_bird_score += 1
-                night_owl_score += 1
-            elif response_value == "9am":
-                night_owl_score += 2
-            elif response_value == "10am":
-                night_owl_score += 3
-            analysis_details["preferred_wake_time"] = response_value
-        
-        # Question 3: Preferred bedtime
-        elif question_id == 3:
-            if response_value in ["8pm", "9pm"]:
-                early_bird_score += 3
-            elif response_value == "10pm":
-                early_bird_score += 2
-            elif response_value == "11pm":
-                early_bird_score += 1
-                night_owl_score += 1
-            elif response_value == "12am":
-                night_owl_score += 2
-            elif response_value == "1am":
-                night_owl_score += 3
-            analysis_details["preferred_bedtime"] = response_value
-        
-        # Question 4: Morning alertness
-        elif question_id == 4:
-            if response_value == "very-alert":
-                early_bird_score += 2
-            elif response_value == "fairly-alert":
-                early_bird_score += 1
-            elif response_value == "slightly-alert":
-                night_owl_score += 1
-            elif response_value == "not-alert":
-                night_owl_score += 2
-            analysis_details["morning_alertness"] = response_value
-        
-        # Question 5: Peak performance time
-        elif question_id == 5:
-            if response_value == "8am-test":
-                early_bird_score += 3
-            elif response_value == "11am-test":
-                early_bird_score += 1
-                night_owl_score += 1
-            elif response_value == "3pm-test":
-                night_owl_score += 1
-                early_bird_score += 1
-            elif response_value == "7pm-test":
-                night_owl_score += 3
-            analysis_details["peak_performance_time"] = response_value
-        
-        # Question 6: Tiredness at 11pm
-        elif question_id == 6:
-            if response_value == "very-tired":
-                early_bird_score += 2
-            elif response_value == "fairly-tired":
-                early_bird_score += 1
-            elif response_value == "slightly-tired":
-                night_owl_score += 1
-            elif response_value == "not-tired":
-                night_owl_score += 2
-            analysis_details["evening_tiredness"] = response_value
-        
-        # Question 7: Sleep recovery pattern
-        elif question_id == 7:
-            if response_value == "wake-later":
-                early_bird_score += 2
-            elif response_value == "wake-later-sleep":
-                early_bird_score += 1
-                night_owl_score += 1
-            elif response_value == "wake-much-later":
-                night_owl_score += 2
-            analysis_details["sleep_recovery"] = response_value
-    
-    # Determine chronotype based on scores
-    if total_questions == 0:
-        raise ValueError("No valid questions answered")
-    
-    # Calculate confidence based on score difference
-    score_difference = abs(early_bird_score - night_owl_score)
-    max_possible_difference = total_questions * 3  # Maximum score per question is 3
-    confidence_score = min(score_difference / max_possible_difference, 1.0)
-    
-    # Classify chronotype
-    if early_bird_score > night_owl_score + 2:
-        chronotype_type = "Early Bird"
-        recommended_schedule = {
-            "bedtime": "9:00 PM - 10:00 PM",
-            "wake_time": "5:00 AM - 6:00 AM"
+        question = question_by_id.get(response.question_id)
+        if not question:
+            raise HTTPException(status_code=400, detail=f"Unknown question id {response.question_id}")
+
+        weights = _weights_for_answer(question.question_key, str(response.answer_value))
+        per_question[question.question_key] = weights
+        for chronotype, weight in weights.items():
+            scores[chronotype] += weight
+
+    normalized = _normalize_scores(scores)
+    chronotype_key = _determine_chronotype(normalized)
+
+    chronotype = ChronotypeSummary(
+        chronotype_type=chronotype_key.capitalize(),
+        confidence_score=round(normalized.get(chronotype_key, 0.0), 3),
+        recommended_sleep_schedule=_sleep_schedule.get(chronotype_key, {}),
+        analysis_details={
+            "scores": normalized,
+            "raw_scores": scores,
+            "question_breakdown": per_question,
+            "recommendations": _recommendations.get(chronotype_key, {}),
+        },
+    )
+
+    return {
+        "chronotype": chronotype,
+        "normalized_scores": normalized,
+        "raw_scores": scores,
+        "question_breakdown": per_question,
+    }
+
+
+def _score_quiz(quiz: QuizDefinition, responses: List[QuizResponsePayload]) -> Dict[str, Any]:
+    return _score_responses(quiz, responses)
+
+
+async def _persist_attempt(
+    db: Client,
+    attempt: QuizAttemptCreate,
+    normalized_scores: Dict[str, float],
+    breakdown: Dict[str, Dict[str, float]],
+    chronotype: ChronotypeSummary | None,
+    raw_scores: Dict[str, float],
+) -> QuizAttemptRecord:
+    summary_map = {
+        **attempt.summary,
+        "chronotype": chronotype.chronotype_type if chronotype else None,
+        "confidence": chronotype.confidence_score if chronotype else None,
+        "scores": normalized_scores,
+        "raw_scores": raw_scores,
+        "question_breakdown": breakdown,
+    }
+
+    attempt_row = {
+        "quiz_id": attempt.quiz_id,
+        "quiz_version": attempt.quiz_version,
+        "user_id": attempt.user_id,
+        "summary": summary_map,
+    }
+    attempt_result = db.table("quiz_attempt").insert(attempt_row).execute()
+    if not attempt_result.data:
+        raise HTTPException(status_code=500, detail="Failed to store quiz attempt")
+
+    attempt_id = attempt_result.data[0]["id"]
+
+    response_rows = [
+        {
+            "attempt_id": attempt_id,
+            "question_id": response.question_id,
+            "answer_value": response.answer_value,
+            "elapsed_ms": response.elapsed_ms,
+            "weights": response.weights,
         }
-    elif night_owl_score > early_bird_score + 2:
-        chronotype_type = "Night Owl"
-        recommended_schedule = {
-            "bedtime": "11:00 PM - 12:00 AM",
-            "wake_time": "7:00 AM - 8:00 AM"
-        }
-    else:
-        chronotype_type = "Intermediate"
-        recommended_schedule = {
-            "bedtime": "10:00 PM - 11:00 PM",
-            "wake_time": "6:00 AM - 7:00 AM"
-        }
-    
-    analysis_details.update({
-        "early_bird_score": early_bird_score,
-        "night_owl_score": night_owl_score,
-        "total_questions": total_questions
-    })
-    
-    return ChronotypeResult(
-        chronotype_type=chronotype_type,
-        confidence_score=confidence_score,
-        analysis_details=analysis_details,
-        recommended_sleep_schedule=recommended_schedule
+        for response in attempt.responses
+    ]
+
+    if response_rows:
+        db.table("quiz_response").insert(response_rows).execute()
+
+    return QuizAttemptRecord(
+        id=attempt_id,
+        quiz_id=attempt.quiz_id,
+        user_id=attempt.user_id,
+        quiz_version=attempt.quiz_version,
+        summary=summary_map,
+        submitted_at=datetime.utcnow(),
     )
 
 
-def create_initial_chronotype_data(chronotype_result: ChronotypeResult) -> List[ChronotypeDataPoint]:
-    """
-    Create initial chronotype data points based on quiz results.
-    Generates a baseline energy curve for the determined chronotype.
-    """
-    data_points = []
-    
-    # Generate energy levels for different times of day based on chronotype
-    if chronotype_result.chronotype_type == "Early Bird":
-        # Early birds peak in morning, decline in evening
-        energy_pattern = [
-            (time(6, 0), 0.8),   # 6 AM - High energy
-            (time(9, 0), 0.9),   # 9 AM - Peak energy
-            (time(12, 0), 0.7),  # 12 PM - Good energy
-            (time(15, 0), 0.6),  # 3 PM - Moderate energy
-            (time(18, 0), 0.4),  # 6 PM - Lower energy
-            (time(21, 0), 0.2),  # 9 PM - Low energy
-        ]
-    elif chronotype_result.chronotype_type == "Night Owl":
-        # Night owls start low, peak in evening
-        energy_pattern = [
-            (time(6, 0), 0.2),   # 6 AM - Low energy
-            (time(9, 0), 0.3),   # 9 AM - Still low
-            (time(12, 0), 0.5),  # 12 PM - Building energy
-            (time(15, 0), 0.7),  # 3 PM - Good energy
-            (time(18, 0), 0.8),  # 6 PM - High energy
-            (time(21, 0), 0.9),  # 9 PM - Peak energy
-        ]
-    else:  # Intermediate
-        # Intermediate types have more balanced energy
-        energy_pattern = [
-            (time(6, 0), 0.4),   # 6 AM - Moderate energy
-            (time(9, 0), 0.7),   # 9 AM - Good energy
-            (time(12, 0), 0.8),  # 12 PM - Peak energy
-            (time(15, 0), 0.7),  # 3 PM - Good energy
-            (time(18, 0), 0.5),  # 6 PM - Moderate energy
-            (time(21, 0), 0.3),  # 9 PM - Lower energy
-        ]
-    
-    # Create data points
-    for time_of_day, predicted_energy in energy_pattern:
-        data_point = ChronotypeDataPoint(
-            time_of_day=time_of_day,
-            predicted_energy_level=predicted_energy,
-            actual_energy_level=predicted_energy,  # Initially same as predicted
-            difference_from_actual=0.0,  # No difference initially
-            context={"source": "initial_quiz", "chronotype": chronotype_result.chronotype_type}
-        )
-        data_points.append(data_point)
-    
-    return data_points
+@router.get("", response_model=QuizDefinition)
+async def get_active_quiz(db: Client = Depends(get_supabase)) -> QuizDefinition:
+    return await _fetch_quiz_definition(db)
 
 
-@router.post("/submit", response_model=QuizSubmissionResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/submit", response_model=QuizSubmissionResult, status_code=status.HTTP_201_CREATED)
 async def submit_quiz(
-    payload: QuizSubmission,
+    payload: QuizSubmissionRequest,
     db: Client = Depends(get_supabase),
-):
-    """
-    Process quiz submission and determine chronotype.
-    Creates initial chronotype data based on quiz results.
-    """
+    authorization: str | None = Header(default=None),
+) -> QuizSubmissionResult:
+    if not authorization or not authorization.lower().startswith("bearer "):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing authorization token")
+
+    token = authorization.split(" ", 1)[1].strip()
+    if not token:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing authorization token")
+
     try:
-        # Analyze quiz responses to determine chronotype
-        chronotype_result = analyze_chronotype(payload.responses)
-        
-        # Generate quiz ID
-        quiz_id = str(uuid4())
-        
-        # Create initial chronotype data
-        initial_data_points = create_initial_chronotype_data(chronotype_result)
-        
-        # Create chronotype record
-        chronotype_id = str(uuid4())
-        chronotype_payload = ChronotypeCreate(
-            user_id=payload.user_id,
-            chronotype_id=chronotype_id,
-            data_points=initial_data_points
+        db.postgrest.auth(token)
+        user_result = db.auth.get_user(token)
+    except Exception as exc:  # pragma: no cover - defensive guard
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=f"Invalid authorization token: {exc}")
+
+    user_data = getattr(user_result, "user", None)
+    user_id = getattr(user_data, "id", None)
+    if not user_id:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Could not resolve authenticated user")
+
+    quiz = await _fetch_quiz_definition(db, quiz_id=payload.quiz_id)
+    if payload.quiz_version != quiz.version:
+        raise HTTPException(status_code=409, detail={"message": "Quiz version mismatch", "quizVersion": quiz.version})
+
+    if len(payload.responses) != len(quiz.questions):
+        raise HTTPException(status_code=400, detail="Every question must be answered")
+
+    scoring = _score_quiz(quiz, payload.responses)
+    chronotype: ChronotypeSummary = scoring["chronotype"]
+
+    enriched_responses = []
+    question_by_id = {question.id: question for question in quiz.questions}
+
+    for response in payload.responses:
+        question = question_by_id[response.question_id]
+        enriched_responses.append(
+            QuizResponsePayload(
+                question_id=response.question_id,
+                answer_value=response.answer_value,
+                elapsed_ms=response.elapsed_ms,
+                weights=_weights_for_answer(question.question_key, str(response.answer_value)),
+            )
         )
-        
-        # Store chronotype in database
-        chronotype_record = chronotype_payload.model_dump()
-        chronotype_record["data_points"] = [dp.model_dump() for dp in initial_data_points]
-        chronotype_record["created_at"] = datetime.utcnow().isoformat()
-        
-        db.table("chronotypes").insert(chronotype_record).execute()
-        
-        # Store quiz responses (optional - for future reference)
-        quiz_record = {
-            "quiz_id": quiz_id,
-            "user_id": payload.user_id,
-            "responses": [r.model_dump() for r in payload.responses],
-            "chronotype_result": chronotype_result.model_dump(),
-            "submitted_at": datetime.utcnow().isoformat()
-        }
-        
-        # Note: You might want to create a separate 'quiz_submissions' table
-        # For now, we'll just return the result
-        
-        return QuizSubmissionResponse(
-            quiz_id=quiz_id,
-            chronotype_result=chronotype_result,
-            chronotype_id=chronotype_id,
-            message=f"Quiz completed! You are classified as a {chronotype_result.chronotype_type} with {chronotype_result.confidence_score:.1%} confidence."
-        )
-        
-    except Exception as exc:
-        raise HTTPException(
-            status_code=500, 
-            detail=f"Error processing quiz: {exc}"
+
+    attempt = QuizAttemptCreate(
+        quiz_id=quiz.id,
+        quiz_version=quiz.version,
+        user_id=user_id,
+        summary={"chronotype": chronotype.chronotype_type},
+        responses=enriched_responses,
+    )
+
+    attempt_record = await _persist_attempt(
+        db,
+        attempt,
+        scoring["normalized_scores"],
+        scoring["question_breakdown"],
+        chronotype,
+        scoring["raw_scores"],
+    )
+
+    return QuizSubmissionResult(
+        attempt=attempt_record,
+        responses=enriched_responses,
+        chronotype=chronotype,
+        raw_scores=scoring["raw_scores"],
+        question_breakdown=scoring["question_breakdown"],
         )

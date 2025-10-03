@@ -1,8 +1,6 @@
 'use client';
 
 import { FormEvent, KeyboardEvent, useMemo, useState } from 'react';
-import Image from 'next/image';
-import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
 
 type ChatMessage = {
@@ -25,17 +23,6 @@ export default function InsightsPage() {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const navigationItems = useMemo(
-    () => [
-      { label: 'Home', href: '/dashboard' },
-      { label: 'Schedule', href: '#' },
-      { label: 'Insights', href: '/insights', active: true },
-      { label: 'Tasks', href: '#' },
-      { label: 'Settings', href: '#' },
-    ],
-    []
-  );
 
   const sendMessage = async () => {
     if (isLoading) {
@@ -114,29 +101,6 @@ export default function InsightsPage() {
 
   return (
     <div className="min-h-screen bg-[#F7F7F7]">
-      <div className="grid min-h-screen grid-cols-[240px_1fr]">
-        {/* Sidebar */}
-        <aside className="bg-white border-r border-gray-200 p-6">
-          <div className="flex items-center gap-3 mb-8">
-            <Link href="/dashboard" aria-label="Go to dashboard">
-              <Image src="/a009048e011b5a410b510b06b126c6e2110c05bf.png" alt="Sero" width={180} height={48} />
-            </Link>
-          </div>
-          <nav className="space-y-2">
-            {navigationItems.map((item) => (
-              <Link
-                key={item.label}
-                href={item.href}
-                className={`block w-full rounded-lg px-4 py-3 text-left text-sm font-medium transition ${
-                  item.active ? 'bg-[#43A070] text-white' : 'text-gray-700 hover:bg-gray-100'
-                }`}
-              >
-                {item.label}
-              </Link>
-            ))}
-          </nav>
-        </aside>
-
         {/* Main */}
         <main className="p-8">
           <div>
@@ -224,7 +188,6 @@ export default function InsightsPage() {
             </aside>
           </div>
         </main>
-      </div>
     </div>
   );
 }
