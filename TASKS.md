@@ -6,6 +6,7 @@
 - [x] ensure that users get a duplicate of a base chronotype that is then ready to be modified and that the app reads from HERE, not from the base chronotype
 - [x] store specific users' chronotypes and data in the database and pull from there across the whole app (remove placeholders)
 - [ ] codebase refactor and cleanup
+- [ ] UI responsiveness
 ## notes (from natalie)
 - [ ] minor fix: make the side bar fixed rather than scroll with the main part of home page
 - [ ] add due date field to create new task (and make sure it recommends a time window for you to do the task)
