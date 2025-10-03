@@ -2,6 +2,8 @@
 
 import { FormEvent, KeyboardEvent, useMemo, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useChronotype } from '@/hooks/useChronotype';
+import { getChronotypeDisplayInfo } from '@/lib/chronotype';
 
 type ChatMessage = {
   id: string;
@@ -12,12 +14,22 @@ type ChatMessage = {
 export default function InsightsPage() {
   const chatEndpoint = process.env.NEXT_PUBLIC_API_URL + '/gemini/chat';
   const { user, loading } = useAuth();
+  const { chronotype, quizResult, hasChronotype } = useChronotype();
   const name = user?.identities?.[0]?.identity_data?.full_name;
+  
+  const getWelcomeMessage = () => {
+    if (hasChronotype && chronotype) {
+      const chronotypeInfo = getChronotypeDisplayInfo(chronotype.label || 'lion');
+      return `Welcome back! I'm tracking how your ${chronotypeInfo.name} chronotype energy patterns align with your daily tasks. What would you like to explore today?`;
+    }
+    return `Welcome back. I am tracking how your energy and tasks align. Take the chronotype quiz to get personalized insights. What would you like to explore today?`;
+  };
+
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: 'assistant-welcome',
       role: 'assistant',
-      content: `Welcome back. I am tracking how your energy and tasks align. What would you like to explore today?`,
+      content: getWelcomeMessage(),
     },
   ]);
   const [input, setInput] = useState('');
@@ -52,16 +64,29 @@ export default function InsightsPage() {
 
     try {
       setIsLoading(true);
+      
+      // Build context with chronotype information
+      const context = {
+        message: trimmed,
+        chronotype: hasChronotype && chronotype ? {
+          type: chronotype.label,
+          description: chronotype.description,
+          guidance: chronotype.guidance,
+        } : null,
+        quizResult: quizResult ? {
+          chronotype: quizResult.raw_result.chronotype_type,
+          confidence: quizResult.raw_result.confidence_score,
+          summary: quizResult.summary,
+        } : null,
+        model: 'gemini-2.5-flash'
+      };
+
       const response = await fetch(chatEndpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          message: trimmed,
-          // history: nextMessages.map(({ role, content }) => ({ role, content }))
-          model: 'gemini-2.5-flash'
-        }),
+        body: JSON.stringify(context),
       });
 
       if (!response.ok) {
@@ -180,11 +205,35 @@ export default function InsightsPage() {
             <aside className="rounded-xl bg-white shadow-sm ring-1 ring-gray-200 p-6">
               <div className="text-xs uppercase tracking-wide text-gray-500">This week</div>
               <div className="mt-2 text-xl font-semibold text-gray-900">Snapshot</div>
-              <ul className="mt-4 space-y-3 text-sm text-gray-700">
-                <li className="rounded-lg bg-gray-50 px-3 py-2">Morning focus windows remain 18% more productive than afternoon sessions.</li>
-                <li className="rounded-lg bg-gray-50 px-3 py-2">Average evening wind-down starts at 7:45 PM, ten minutes earlier than last week.</li>
-                <li className="rounded-lg bg-gray-50 px-3 py-2">Keep stacking deep work before lunch to sustain the current momentum.</li>
-              </ul>
+              {hasChronotype && chronotype ? (
+                <ul className="mt-4 space-y-3 text-sm text-gray-700">
+                  {chronotype.guidance?.status_title && (
+                    <li className="rounded-lg bg-gray-50 px-3 py-2">
+                      {chronotype.guidance.status_body || `Your ${chronotype.label} chronotype patterns are being tracked.`}
+                    </li>
+                  )}
+                  {quizResult?.summary?.chronotype && (
+                    <li className="rounded-lg bg-gray-50 px-3 py-2">
+                      {quizResult.summary.chronotype} chronotype detected with {Math.round(quizResult.summary.confidence * 100)}% confidence.
+                    </li>
+                  )}
+                  <li className="rounded-lg bg-gray-50 px-3 py-2">
+                    {chronotype.description || `Track your energy patterns to optimize your ${chronotype.label} chronotype schedule.`}
+                  </li>
+                </ul>
+              ) : (
+                <ul className="mt-4 space-y-3 text-sm text-gray-700">
+                  <li className="rounded-lg bg-gray-50 px-3 py-2">
+                    Take the chronotype quiz to get personalized energy insights.
+                  </li>
+                  <li className="rounded-lg bg-gray-50 px-3 py-2">
+                    Discover your optimal focus windows and energy patterns.
+                  </li>
+                  <li className="rounded-lg bg-gray-50 px-3 py-2">
+                    Get AI-powered recommendations based on your chronotype.
+                  </li>
+                </ul>
+              )}
             </aside>
           </div>
         </main>

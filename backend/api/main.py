@@ -10,6 +10,7 @@ from backend.dependencies import get_supabase
 from backend.api.chronotype import router as chronotype_router
 from backend.api.quiz import router as quiz_router
 from backend.api.gemini import router as gemini_router
+from backend.api.user import router as user_router
 
 app = FastAPI(
     title="Sero Backend API",
@@ -25,6 +26,9 @@ app.include_router(quiz_router)
 
 # add gemini wrapper endpoints router
 app.include_router(gemini_router)
+
+# add user endpoints router
+app.include_router(user_router)
 
 # CORS middleware
 app.add_middleware(

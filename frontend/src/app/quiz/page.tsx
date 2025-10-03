@@ -364,7 +364,7 @@ export default function QuizPage() {
             </div>
             <div className="hidden lg:flex items-center justify-center">
               <Image
-                src="/48bc971cb110c807f8c6cf903c7add4b1c9dfcd7.png"
+                src="/lion.png"
                 alt="Chronotype illustration"
                 width={480}
                 height={320}
@@ -397,7 +397,7 @@ export default function QuizPage() {
 
         <h1 className="text-3xl font-bold text-gray-900 mb-12 text-center">{question.prompt}</h1>
 
-        <div className="mb-12">
+        {/* <div className="mb-12">
           <div className="relative">
             <input
               type="text"
@@ -417,7 +417,7 @@ export default function QuizPage() {
               </svg>
             </button>
           </div>
-        </div>
+        </div> */}
 
         <div className={`grid gap-4 mb-16 ${gridCols}`}>
           {questionOptions.map((option) => (

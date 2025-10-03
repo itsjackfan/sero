@@ -2,9 +2,9 @@
 - [ ] login validation and account creation logic
 - [ ] update insights chatbot to actually remember context
 - [ ] rewrite insights chatbot prompt
-- [ ] seed with real chronotype information 
-- [ ] ensure that users get a duplicate of a base chronotype that is then ready to be modified and that the app reads from HERE, not from the base chronotype
-- [ ] store specific users' chronotypes and data in the database and pull from there across the whole app (remove placeholders)
+- [x] seed with real chronotype information 
+- [x] ensure that users get a duplicate of a base chronotype that is then ready to be modified and that the app reads from HERE, not from the base chronotype
+- [x] store specific users' chronotypes and data in the database and pull from there across the whole app (remove placeholders)
 - [ ] codebase refactor and cleanup 
 
 ---

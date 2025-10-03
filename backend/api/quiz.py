@@ -17,6 +17,15 @@ from backend.models import (
     QuizSubmissionRequest,
     QuizSubmissionResult,
 )
+from backend.models.chronotype import (
+    UserQuizResultCreate,
+    UserQuizResultRecord,
+    UserQuizAnswerCreate,
+    UserChronotypeCreate,
+    UserChronotypeRecord,
+    UserChronotypeEnergyCurveCreate,
+    UserFocusWindowCreate,
+)
 
 router = APIRouter(prefix="/quiz", tags=["Quiz"])
 
@@ -196,6 +205,137 @@ def _score_quiz(quiz: QuizDefinition, responses: List[QuizResponsePayload]) -> D
     return _score_responses(quiz, responses)
 
 
+async def _create_user_chronotype(
+    db: Client,
+    user_id: str,
+    chronotype_type: str,
+) -> UserChronotypeRecord:
+    """Create a user chronotype by duplicating from chronotype_profiles."""
+    # Get the chronotype profile
+    profile_result = db.table("chronotype_profiles").select("*").eq("slug", chronotype_type.lower()).execute()
+    if not profile_result.data:
+        raise HTTPException(status_code=404, detail=f"Chronotype profile not found: {chronotype_type}")
+    
+    profile = profile_result.data[0]
+    
+    # Create user chronotype - match actual schema
+    user_chronotype_data = {
+        "user_id": user_id,
+        "profile_id": profile["id"],
+        "label": profile.get("display_name", ""),
+        "description": profile.get("summary", ""),
+        "source": "quiz",
+        "data_points": {},
+        "guidance": {
+            "status_title": profile.get("status_title", ""),
+            "status_body": profile.get("status_body", ""),
+            "insights_prompt": profile.get("insights_prompt", ""),
+        },
+    }
+    
+    chronotype_result = db.table("user_chronotypes").insert(user_chronotype_data).execute()
+    if not chronotype_result.data:
+        raise HTTPException(status_code=500, detail="Failed to create user chronotype")
+    
+    user_chronotype = chronotype_result.data[0]
+    
+    # Copy energy curve data
+    energy_curve_result = db.table("chronotype_energy_curve").select("*").eq("profile_id", profile["id"]).execute()
+    if energy_curve_result.data:
+        energy_curve_rows = [
+            {
+                "user_chronotype_id": user_chronotype["id"],
+                "hour": curve["hour"],
+                "predicted_energy": curve["relative_energy"],
+                "actual_energy": None,  # Will be filled in later as user provides data
+            }
+            for curve in energy_curve_result.data
+        ]
+        db.table("user_chronotype_energy_curve").insert(energy_curve_rows).execute()
+    
+    # Copy focus windows data
+    focus_windows_result = db.table("chronotype_focus_windows").select("*").eq("profile_id", profile["id"]).execute()
+    if focus_windows_result.data:
+        focus_window_rows = [
+            {
+                "user_chronotype_id": user_chronotype["id"],
+                "window_type": window["window_type"],
+                "start_hour": window["start_hour"],
+                "end_hour": window["end_hour"],
+                "recommendation": window["recommendation"],
+            }
+            for window in focus_windows_result.data
+        ]
+        db.table("user_focus_windows").insert(focus_window_rows).execute()
+    
+    return UserChronotypeRecord(**user_chronotype)
+
+
+async def _persist_quiz_results(
+    db: Client,
+    user_id: str,
+    quiz_id: str,
+    quiz_version: int,
+    chronotype: ChronotypeSummary,
+    raw_scores: Dict[str, float],
+    breakdown: Dict[str, Dict[str, float]],
+    responses: List[QuizResponsePayload],
+) -> UserQuizResultRecord:
+    """Store quiz results in user-specific tables."""
+    # Get the profile_id for the chronotype
+    profile_result = db.table("chronotype_profiles").select("id").eq("slug", chronotype.chronotype_type.lower()).execute()
+    if not profile_result.data:
+        raise HTTPException(status_code=404, detail=f"Chronotype profile not found: {chronotype.chronotype_type}")
+    
+    profile_id = profile_result.data[0]["id"]
+    
+    # Create user quiz result - match actual schema
+    result_data = {
+        "user_id": user_id,
+        "quiz_id": quiz_id,
+        "quiz_version": quiz_version,
+        "profile_id": profile_id,
+        "score": chronotype.confidence_score,
+        "raw_result": {
+            "chronotype_type": chronotype.chronotype_type.lower(),
+            "confidence_score": chronotype.confidence_score,
+            "raw_scores": raw_scores,
+            "question_breakdown": breakdown,
+        },
+        "summary": {
+            "chronotype": chronotype.chronotype_type,
+            "confidence": chronotype.confidence_score,
+            "recommended_sleep_schedule": chronotype.recommended_sleep_schedule,
+            "analysis_details": chronotype.analysis_details,
+        },
+    }
+    
+    result_response = db.table("user_quiz_results").insert(result_data).execute()
+    if not result_response.data:
+        raise HTTPException(status_code=500, detail="Failed to store quiz result")
+    
+    result = result_response.data[0]
+    result_id = result["id"]
+    
+    # Store individual answers
+    if responses:
+        answer_rows = [
+            {
+                "result_id": result_id,
+                "question_id": response.question_id,
+                "answer_value": response.answer_value,
+                "weights": response.weights,
+                "metadata": {
+                    "elapsed_ms": response.elapsed_ms,
+                } if response.elapsed_ms else {},
+            }
+            for response in responses
+        ]
+        db.table("user_quiz_answers").insert(answer_rows).execute()
+    
+    return UserQuizResultRecord(**result)
+
+
 async def _persist_attempt(
     db: Client,
     attempt: QuizAttemptCreate,
@@ -204,6 +344,7 @@ async def _persist_attempt(
     chronotype: ChronotypeSummary | None,
     raw_scores: Dict[str, float],
 ) -> QuizAttemptRecord:
+    """Legacy function for backward compatibility - now also creates user chronotype and stores in new tables."""
     summary_map = {
         **attempt.summary,
         "chronotype": chronotype.chronotype_type if chronotype else None,
@@ -238,6 +379,14 @@ async def _persist_attempt(
 
     if response_rows:
         db.table("quiz_response").insert(response_rows).execute()
+
+    # NEW: Create user chronotype and store in user-specific tables
+    if chronotype:
+        await _create_user_chronotype(db, attempt.user_id, chronotype.chronotype_type)
+        await _persist_quiz_results(
+            db, attempt.user_id, attempt.quiz_id, attempt.quiz_version,
+            chronotype, raw_scores, breakdown, attempt.responses
+        )
 
     return QuizAttemptRecord(
         id=attempt_id,
@@ -325,4 +474,84 @@ async def submit_quiz(
         chronotype=chronotype,
         raw_scores=scoring["raw_scores"],
         question_breakdown=scoring["question_breakdown"],
-        )
+        message="Chronotype determined and saved",
+    )
+
+
+@router.get("/results", response_model=UserQuizResultRecord)
+async def get_user_quiz_results(
+    db: Client = Depends(get_supabase),
+    authorization: str | None = Header(default=None),
+) -> UserQuizResultRecord:
+    """Get the user's most recent quiz result."""
+    if not authorization or not authorization.lower().startswith("bearer "):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing authorization token")
+
+    token = authorization.split(" ", 1)[1].strip()
+    if not token:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing authorization token")
+
+    try:
+        db.postgrest.auth(token)
+        user_result = db.auth.get_user(token)
+    except Exception as exc:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=f"Invalid authorization token: {exc}")
+
+    user_data = getattr(user_result, "user", None)
+    user_id = getattr(user_data, "id", None)
+    if not user_id:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Could not resolve authenticated user")
+
+    # Get the most recent quiz result for this user
+    result_response = (
+        db.table("user_quiz_results")
+        .select("*")
+        .eq("user_id", user_id)
+        .order("created_at", desc=True)
+        .limit(1)
+        .execute()
+    )
+
+    if not result_response.data:
+        raise HTTPException(status_code=404, detail="No quiz results found for user")
+
+    return UserQuizResultRecord(**result_response.data[0])
+
+
+@router.get("/chronotype", response_model=UserChronotypeRecord)
+async def get_user_chronotype(
+    db: Client = Depends(get_supabase),
+    authorization: str | None = Header(default=None),
+) -> UserChronotypeRecord:
+    """Get the user's chronotype."""
+    if not authorization or not authorization.lower().startswith("bearer "):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing authorization token")
+
+    token = authorization.split(" ", 1)[1].strip()
+    if not token:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing authorization token")
+
+    try:
+        db.postgrest.auth(token)
+        user_result = db.auth.get_user(token)
+    except Exception as exc:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=f"Invalid authorization token: {exc}")
+
+    user_data = getattr(user_result, "user", None)
+    user_id = getattr(user_data, "id", None)
+    if not user_id:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Could not resolve authenticated user")
+
+    # Get the user's chronotype
+    chronotype_response = (
+        db.table("user_chronotypes")
+        .select("*")
+        .eq("user_id", user_id)
+        .limit(1)
+        .execute()
+    )
+
+    if not chronotype_response.data:
+        raise HTTPException(status_code=404, detail="No chronotype found for user")
+
+    return UserChronotypeRecord(**chronotype_response.data[0])

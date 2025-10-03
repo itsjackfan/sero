@@ -17,6 +17,7 @@ import {
   type SidebarFilters,
   type FocusLevel,
 } from '@/components/tasks/TasksSidebar';
+import { useChronotype } from '@/hooks/useChronotype';
 
 const START_HOUR = 8;
 const END_HOUR = 20;
@@ -78,10 +79,9 @@ const toDurationLabel = (minutes: number) => {
 const clampDuration = (startSlot: number, durationSlots: number) =>
   Math.max(1, Math.min(durationSlots, SLOTS_PER_DAY - startSlot));
 
-const HIGH_BAND = { startHour: 10, endHour: 12, color: '#22c55e', opacity: 0.35 };
-const MEDIUM_BAND = { startHour: 16, endHour: 18, color: '#86efac', opacity: 0.25 };
-
-const energyBands = [HIGH_BAND, MEDIUM_BAND];
+// Default energy bands (will be overridden by chronotype data)
+const DEFAULT_HIGH_BAND = { startHour: 10, endHour: 12, color: '#22c55e', opacity: 0.35 };
+const DEFAULT_MEDIUM_BAND = { startHour: 16, endHour: 18, color: '#86efac', opacity: 0.25 };
 
 const timeSlots = Array.from({ length: SLOTS_PER_DAY }, (_, index) => index);
 
@@ -147,6 +147,7 @@ const initialSidebarTasks: TaskSummary[] = [
 ];
 
 export default function SchedulePage() {
+  const { chronotype, focusWindows, hasChronotype } = useChronotype();
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [viewState, setViewState] = useState<ViewState>(getInitialViewState);
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -208,6 +209,81 @@ export default function SchedulePage() {
 
   const viewDayKeys = useMemo(() => viewDates.map(formatISODate), [viewDates]);
   const currentDayIndex = viewDayKeys.indexOf(viewState.todayKey);
+
+  // Generate energy bands from chronotype focus windows
+  const energyBands = useMemo(() => {
+    if (!hasChronotype || !focusWindows.length) {
+      return [DEFAULT_HIGH_BAND, DEFAULT_MEDIUM_BAND];
+    }
+
+    return focusWindows
+      .filter(window => window.window_type === 'deep' || window.window_type === 'collaboration')
+      .map(window => ({
+        startHour: window.start_hour,
+        endHour: window.end_hour,
+        color: window.window_type === 'deep' ? '#22c55e' : '#86efac',
+        opacity: window.window_type === 'deep' ? 0.35 : 0.25,
+        type: window.window_type,
+        recommendation: window.recommendation,
+      }));
+  }, [hasChronotype, focusWindows]);
+
+  // Generate chronotype-based task suggestions
+  const chronotypeTaskSuggestions = useMemo(() => {
+    if (!hasChronotype || !focusWindows.length) {
+      return initialSidebarTasks;
+    }
+
+    const suggestions: TaskSummary[] = [];
+    
+    // Find deep focus window for strategy work
+    const deepWindow = focusWindows.find(w => w.window_type === 'deep');
+    if (deepWindow) {
+      suggestions.push({
+        id: 'chronotype-strategy',
+        title: 'Strategy planning session',
+        lengthMinutes: 90,
+        lengthLabel: '90 min',
+        focusLabel: 'Deep focus',
+        suggestionLabel: `Suggested: Today ${deepWindow.start_hour}:00`,
+        dueLabel: 'Optimal timing',
+      });
+    }
+
+    // Find collaboration window for meetings
+    const collaborationWindow = focusWindows.find(w => w.window_type === 'collaboration');
+    if (collaborationWindow) {
+      suggestions.push({
+        id: 'chronotype-meeting',
+        title: 'Team collaboration',
+        lengthMinutes: 30,
+        lengthLabel: '30 min',
+        focusLabel: 'Medium focus',
+        suggestionLabel: `Suggested: Today ${collaborationWindow.start_hour}:00`,
+        dueLabel: 'Optimal timing',
+      });
+    }
+
+    // Add a recovery/light task suggestion
+    suggestions.push({
+      id: 'chronotype-recovery',
+      title: 'Light administrative tasks',
+      lengthMinutes: 20,
+      lengthLabel: '20 min',
+      focusLabel: 'Shallow focus',
+      suggestionLabel: 'Suggested: Between focus windows',
+      dueLabel: 'Energy optimization',
+    });
+
+    return suggestions.length > 0 ? suggestions : initialSidebarTasks;
+  }, [hasChronotype, focusWindows]);
+
+  // Update sidebar tasks when chronotype data is available
+  useEffect(() => {
+    if (chronotypeTaskSuggestions.length > 0) {
+      setSidebarTasks(chronotypeTaskSuggestions);
+    }
+  }, [chronotypeTaskSuggestions]);
 
   const filteredSidebarTasks = useMemo(() => {
     return sidebarTasks.filter((task) => {
@@ -663,7 +739,7 @@ export default function SchedulePage() {
                                     <span className="text-[10px] text-emerald-500 uppercase">{task.focusLevel}</span>
                                   </div>
                                   <div className="mt-1 text-[10px] text-gray-500">
-                                    {formatRange(task.startSlot, task.durationSlots)} · {durationLabel}
+                                    {formatRange(task.startSlot, task.durationSlots)}
                                   </div>
                                 </div>
                               );
