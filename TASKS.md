@@ -12,6 +12,7 @@
 - [ ] add due date field to create new task (and make sure it recommends a time window for you to do the task)
 - [ ] i think there's some glitch where when you click on a new page it shows a different page for 1 second
 - [ ] Also your tasks on calendar disappear/reset if you click onto another page
+- [ ] replace the animal silhouette at the end of the quiz, rn it's just lion
 x
 ---
 ## MIDTERM CRIT
