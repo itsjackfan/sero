@@ -14,7 +14,7 @@
 - [ ] Also the tasks on calendar disappear/reset if you click onto another page
 - [ ] replace the animal silhouette at the end of the quiz, rn it's just lion
 - [ ] Auto scroll down on chatbot interface when new messages generate
-- [ ] dragging interaction is not very intuitive ( based on my user testing)
+- [ ] dragging interaction is not very intuitive, also checkbox tripped people up ( based on my user testing)
 x
 ---
 ## MIDTERM CRIT
