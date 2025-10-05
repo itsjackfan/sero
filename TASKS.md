@@ -11,10 +11,10 @@
 - [ ] minor fix: make the side bar fixed rather than scroll with the main part of home page
 - [ ] add due date field to create new task (and make sure it recommends a time window for you to do the task)
 - [ ] i think there's some glitch where when you click on a new page it shows a different page for 1 second
-- [ ] Also your tasks on calendar disappear/reset if you click onto another page
+- [ ] Also the tasks on calendar disappear/reset if you click onto another page
 - [ ] replace the animal silhouette at the end of the quiz, rn it's just lion
 - [ ] Auto scroll down on chatbot interface when new messages generate
-- [ ] Chatbot seems to just become chatgpt/gemini after a bit and forgets the whole conversation
+- [ ] dragging interaction is not very intuitive ( based on my user testing)
 x
 ---
 ## MIDTERM CRIT
