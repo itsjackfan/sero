@@ -8,10 +8,19 @@
 - [x] seed with real chronotype information 
 - [x] ensure that users get a duplicate of a base chronotype that is then ready to be modified and that the app reads from HERE, not from the base chronotype
 - [x] store specific users' chronotypes and data in the database and pull from there across the whole app (remove placeholders)
-- [ ] codebase refactor and cleanup 
+- [ ] codebase refactor and cleanup
     - [ ] security
     - [ ] componentisation
     - [ ] API improvements/potential general serviceification to allow Go lmfaoooo
+- [ ] UI responsiveness
+## notes (from natalie)
+- [ ] minor fix: make the side bar fixed rather than scroll with the main part of home page
+- [ ] add due date field to create new task (and make sure it recommends a time window for you to do the task)
+- [ ] i think there's some glitch where when you click on a new page it shows a different page for 1 second
+- [ ] Also the tasks on calendar disappear/reset if you click onto another page
+- [ ] replace the animal silhouette at the end of the quiz, rn it's just lion
+- [ ] Auto scroll down on chatbot interface when new messages generate
+- [ ] dragging interaction is not very intuitive, also checkbox tripped people up ( based on my user testing)
 
 ### LATER
 - [ ] 2-way Gcal integration to map events onto Sero's cal interface
