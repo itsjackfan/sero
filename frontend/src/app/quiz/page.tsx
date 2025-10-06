@@ -3,6 +3,7 @@
 import { JSX, useCallback, useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
 import { useAuth } from '@/contexts/AuthContext';
+import { getChronotypeDisplayInfo } from '@/lib/chronotype';
 
 
 interface QuizOption {
@@ -313,6 +314,7 @@ export default function QuizPage() {
     );
   } else if (result) {
     const scheduleEntries = Object.entries(result.chronotype.recommended_sleep_schedule || {});
+    const chronotypeInfo = getChronotypeDisplayInfo(result.chronotype.chronotype_type || 'lion');
 
     content = (
       <div className="px-16 py-12">
@@ -364,8 +366,8 @@ export default function QuizPage() {
             </div>
             <div className="hidden lg:flex items-center justify-center">
               <Image
-                src="/lion.png"
-                alt="Chronotype illustration"
+                src={chronotypeInfo.image}
+                alt={`${chronotypeInfo.name} chronotype illustration`}
                 width={480}
                 height={320}
                 className="opacity-60 -scale-x-100"

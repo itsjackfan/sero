@@ -1,11 +1,22 @@
 ## USER TESTING PUSH
 - [ ] login validation and account creation logic
+    - [ ] flow detection: "have you already completed the quiz?" if not -> quiz, if so -> main
 - [ ] update insights chatbot to actually remember context
 - [ ] rewrite insights chatbot prompt
+- [ ] persistence/tasks into DB, not just ephemeral UI
+- [ ] task creation by dragging directly onto calendar
 - [x] seed with real chronotype information 
 - [x] ensure that users get a duplicate of a base chronotype that is then ready to be modified and that the app reads from HERE, not from the base chronotype
 - [x] store specific users' chronotypes and data in the database and pull from there across the whole app (remove placeholders)
 - [ ] codebase refactor and cleanup 
+    - [ ] security
+    - [ ] componentisation
+    - [ ] API improvements/potential general serviceification to allow Go lmfaoooo
+
+### LATER
+- [ ] 2-way Gcal integration to map events onto Sero's cal interface
+- [ ] 2-way task manager integration, e.g. TickTick or Todoist (or make it its own task manager idk)
+- [ ] External biometric data integration process
 
 ---
 ## MIDTERM CRIT
