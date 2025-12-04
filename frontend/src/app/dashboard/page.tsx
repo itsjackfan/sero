@@ -1,11 +1,12 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
 import {
   Area,
   AreaChart,
   CartesianGrid,
+  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -19,6 +20,8 @@ export default function DashboardPage() {
   const name = user?.identities?.[0]?.identity_data?.full_name;
   const [showChronotypeModal, setShowChronotypeModal] = useState(false);
   const [showEnergyModal, setShowEnergyModal] = useState(false);
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+  const [energyScale, setEnergyScale] = useState(1); // demo-only visual adjustment
 
   const energySeries = useMemo(() => {
     const points = [
@@ -50,6 +53,79 @@ export default function DashboardPage() {
       };
     });
   }, []);
+
+  // Helper function to parse time string (e.g., '8AM', '12PM', '3PM') to hour (0-23)
+  const parseTimeToHour = (timeStr: string): number => {
+    const match = timeStr.match(/(\d+)(AM|PM)/);
+    if (!match) return 0;
+    let hour = parseInt(match[1], 10);
+    const period = match[2];
+    if (period === 'PM' && hour !== 12) hour += 12;
+    if (period === 'AM' && hour === 12) hour = 0;
+    return hour;
+  };
+
+  // Get current hour
+  const currentHour = useMemo(() => {
+    return new Date().getHours();
+  }, []);
+
+  // Adjusted series based on user feedback (demo-only)
+  // Also filter actual energy to only show up to current time
+  const adjustedEnergySeries = useMemo(
+    () =>
+      energySeries.map((point) => {
+        const pointHour = parseTimeToHour(point.time);
+        const adjustedActual = Math.max(
+          0,
+          Math.min(100, Math.round(point.actual * energyScale)),
+        );
+        return {
+          ...point,
+          // Only show actual energy up to current hour, set to null for future times
+          actual: pointHour <= currentHour ? adjustedActual : null,
+        };
+      }),
+    [energySeries, energyScale, currentHour],
+  );
+
+  // Find the current time data point (last one with actual energy)
+  const currentTimePoint = useMemo(() => {
+    const lastActualPoint = adjustedEnergySeries
+      .slice()
+      .reverse()
+      .find((point) => point.actual !== null);
+    return lastActualPoint || null;
+  }, [adjustedEnergySeries]);
+
+  // Simple representative prediction value for the modal
+  const predictedLevel =
+    energySeries.length > 0
+      ? energySeries[Math.floor(energySeries.length / 2)].projected
+      : 72;
+
+  // Global keyboard listener for "d" key to open feedback modal
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key.toLowerCase() === 'd') {
+        setShowFeedbackModal(true);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  const handleFeedbackChoice = (choice: 'higher' | 'lower' | 'same') => {
+    if (choice === 'higher') {
+      setEnergyScale(1.12);
+    } else if (choice === 'lower') {
+      setEnergyScale(0.88);
+    } else {
+      setEnergyScale(1);
+    }
+    setShowFeedbackModal(false);
+  };
 
   const tooltipFormatter = (value: number) => `${value}%`;
 
@@ -114,7 +190,10 @@ export default function DashboardPage() {
                 {/* Animated energy chart */}
                 <div className="relative h-[260px]">
                   <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={energySeries} margin={{ top: 10, left: -24, right: 10, bottom: 0 }}>
+                    <AreaChart
+                      data={adjustedEnergySeries}
+                      margin={{ top: 10, left: -24, right: 10, bottom: 0 }}
+                    >
                       <defs>
                         <linearGradient id="actualGradient" x1="0" y1="0" x2="0" y2="1">
                           <stop offset="5%" stopColor="#1F2937" stopOpacity={0.2} />
@@ -154,7 +233,37 @@ export default function DashboardPage() {
                         fill="url(#actualGradient)"
                         animationDuration={1200}
                         name="Actual energy"
+                        dot={(props: any) => {
+                          // Only show dot at the last actual energy point (current time)
+                          if (
+                            currentTimePoint &&
+                            props.payload.time === currentTimePoint.time &&
+                            props.payload.actual !== null
+                          ) {
+                            return (
+                              <circle
+                                cx={props.cx}
+                                cy={props.cy}
+                                r={5}
+                                fill="#1F2937"
+                                stroke="#fff"
+                                strokeWidth={2}
+                              />
+                            );
+                          }
+                          return <g />;
+                        }}
                       />
+                      {/* Dashed vertical line at current time */}
+                      {currentTimePoint && (
+                        <ReferenceLine
+                          x={currentTimePoint.time}
+                          stroke="#1F2937"
+                          strokeWidth={2}
+                          strokeDasharray="5 5"
+                          opacity={0.5}
+                        />
+                      )}
                     </AreaChart>
                   </ResponsiveContainer>
                   <div className="pointer-events-none absolute right-4 top-4 flex flex-col items-end text-xs text-gray-500">
@@ -305,6 +414,75 @@ export default function DashboardPage() {
                 <span className="text-xl" aria-hidden>🧘</span>
                 <p>{"Light breaks, hydration, and a short reset this afternoon will help you finish the day strong without overextending."}</p>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Higher / lower / same feedback modal (triggered with "d") */}
+      {showFeedbackModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center px-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="feedback-modal-title"
+        >
+          <div
+            className="absolute inset-0 bg-black/40"
+            onClick={() => setShowFeedbackModal(false)}
+          />
+          <div className="relative w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                  Quick check-in
+                </div>
+                <h2
+                  id="feedback-modal-title"
+                  className="mt-1 text-lg font-semibold text-gray-900"
+                >
+                  How does this feel compared to your prediction?
+                </h2>
+              </div>
+              <button
+                className="ml-4 rounded-full bg-gray-100 px-2 py-1 text-lg leading-none text-gray-500 hover:text-gray-800"
+                onClick={() => setShowFeedbackModal(false)}
+                aria-label="Close"
+              >
+                ×
+              </button>
+            </div>
+
+            <p className="mt-4 text-sm text-gray-700">
+              Your current predicted energy level is{' '}
+              <span className="font-semibold text-gray-900">
+                {predictedLevel}%
+              </span>{' '}
+              based on your chronotype.
+            </p>
+            <p className="mt-2 text-sm text-gray-700">
+              Are your actual energy levels higher, lower, or about the same as
+              this prediction?
+            </p>
+
+            <div className="mt-5 grid grid-cols-3 gap-3">
+              <button
+                className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-medium text-gray-900 shadow-sm transition hover:border-[#16A34A] hover:bg-[#16A34A]/10"
+                onClick={() => handleFeedbackChoice('higher')}
+              >
+                Higher
+              </button>
+              <button
+                className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-medium text-gray-900 shadow-sm transition hover:border-[#DC2626] hover:bg-[#DC2626]/10"
+                onClick={() => handleFeedbackChoice('lower')}
+              >
+                Lower
+              </button>
+              <button
+                className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-medium text-gray-900 shadow-sm transition hover:border-gray-700 hover:bg-gray-900 hover:text-white"
+                onClick={() => handleFeedbackChoice('same')}
+              >
+                About the same
+              </button>
             </div>
           </div>
         </div>
